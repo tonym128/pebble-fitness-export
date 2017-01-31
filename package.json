@@ -1,0 +1,41 @@
+{
+    "author": "Natasha Kerensikova",
+    "dependencies": {},
+    "keywords": [],
+    "name": "health-export",
+    "pebble": {
+        "capabilities": [
+            "configurable",
+            "health"
+        ],
+        "displayName": "Pebble Health Export",
+        "enableMultiJS": true,
+        "messageKeys": {
+            "cfgAutoClose": 310,
+            "cfgEnd": 302,
+            "cfgStart": 301,
+            "cfgWakeupTime": 320,
+            "dataKey": 210,
+            "dataLine": 220,
+            "lastSent": 110,
+            "modalMessage": 120,
+            "uploadDone": 130,
+            "uploadFailed": 150,
+            "uploadStart": 140
+        },
+        "projectType": "native",
+        "resources": {
+            "media": []
+        },
+        "sdkVersion": "3",
+        "targetPlatforms": [
+            "diorite",
+            "emery"
+        ],
+        "uuid": "d2cb5dda-d554-47d7-bed7-357bd1685ed7",
+        "watchapp": {
+            "watchface": false
+        }
+    },
+    "version": "1.1.0"
+}
