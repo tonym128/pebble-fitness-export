@@ -31,19 +31,18 @@ var to_send = [];
 var senders = [new XMLHttpRequest(), new XMLHttpRequest()];
 var i_sender = 1;
 var bundle_size = 0;
-var jsSHA = require("./sha.js");
 
 function sendPayload(payload) {
   var data = {};
    var components = payload.split(',');
-   data["time"] = components[0];
-   data["steps"] = components[1];
-   data["yaw"] = components[2];
-   data["pitch"] = components[3];
-   data["vmc"] = components[4];
-   data["light"] = components[5];
-   data["activity"] = components[6];
-   data["hrbpm"] = components[7];
+   data.time = components[0];
+   data.steps = components[1];
+   data.yaw = components[2];
+   data.pitch = components[3];
+   data.vmc = components[4];
+   data.light = components[5];
+   data.activity = components[6];
+   data.hrbpm = components[7];
 
    if (cfg_extra_fields.length > 0) {
       for (var i = 0; i < cfg_extra_fields.length; i += 1) {
@@ -56,7 +55,7 @@ function sendPayload(payload) {
     
    i_sender = 1 - i_sender;
    senders[i_sender].open("POST", cfg_endpoint, true);
-   senders[i_sender].setRequestHeader("Content-Type", "application/json;charset=UTF-8")
+   senders[i_sender].setRequestHeader("Content-Type", "application/json;charset=UTF-8");
    senders[i_sender].send(JSON.stringify(data));
 }
 
