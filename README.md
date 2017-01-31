@@ -1,2 +1,2 @@
-# pebble-fitness-export
+# pebble-health-export
 Pebble JS Health Exporter
