@@ -33,30 +33,30 @@ var i_sender = 1;
 var bundle_size = 0;
 
 function sendPayload(payload) {
-  var data = {};
-   var components = payload.split(',');
-   data.time = components[0];
-   data.steps = components[1];
-   data.yaw = components[2];
-   data.pitch = components[3];
-   data.vmc = components[4];
-   data.light = components[5];
-   data.activity = components[6];
-   data.hrbpm = components[7];
-
-   if (cfg_extra_fields.length > 0) {
-      for (var i = 0; i < cfg_extra_fields.length; i += 1) {
-         var decoded = decodeURIComponent(cfg_extra_fields[i]).split("=");
-         var name = decoded.shift();
-         var value = decoded.join("=");
-         data[name] = value;
-      }
-   }
-    
+   var items = payload.split(cfg_bundle_separator);
+   var payload_array = [];
+   var counter = 0;
+  
+   while (counter < items.length) {
+     var data = {};
+     var components = items[counter].split(',');
+     data.timestamp = components[0];
+     data.steps = components[1];
+     data.yaw = components[2];
+     data.pitch = components[3];
+     data.vmc = components[4];
+     data.light = components[5];
+     data.activity = components[6];
+     data.hrbpm = components[7];
+     payload_array.push(data);
+     counter++;
+    }
+  
    i_sender = 1 - i_sender;
    senders[i_sender].open("POST", cfg_endpoint, true);
+   senders[i_sender].setRequestHeader("Authorization", "Token token="+cfg_sign_key);
    senders[i_sender].setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-   senders[i_sender].send(JSON.stringify(data));
+   senders[i_sender].send(JSON.stringify(payload_array));
 }
 
 function sendHead() {
@@ -121,7 +121,7 @@ Pebble.addEventListener("ready", function() {
    cfg_auto_close = (parseInt(localStorage.getItem("cfgAutoClose") || "0", 10) > 0);
    cfg_wakeup_time = parseInt(localStorage.getItem("cfgWakeupTime") || "-1", 10);
 
-   if (!(cfg_bundle_max >= 1)) cfg_bundle_max = 1;
+   if (cfg_bundle_max < 1) cfg_bundle_max = 1;
 
    var msg = {};
 
@@ -167,10 +167,10 @@ Pebble.addEventListener("showConfiguration", function() {
    }
    if (cfg_sign_field) {
       settings += "&s_algo=" + encodeURIComponent(cfg_sign_algo)
-       + "&s_field=" + encodeURIComponent(cfg_sign_field)
-       + "&s_fieldf=" + encodeURIComponent(cfg_sign_field_format)
-       + "&s_key=" + encodeURIComponent(cfg_sign_key)
-       + "&s_keyf=" + encodeURIComponent(cfg_sign_key_format);
+        + "&s_field=" + encodeURIComponent(cfg_sign_field)
+        + "&s_fieldf=" + encodeURIComponent(cfg_sign_field_format)
+        + "&s_key=" + encodeURIComponent(cfg_sign_key)
+        + "&s_keyf=" + encodeURIComponent(cfg_sign_key_format);
    }
 
    if (cfg_auto_close) {
@@ -205,7 +205,7 @@ Pebble.addEventListener("webviewclosed", function(e) {
 
    if (configData.bundleMax) {
       cfg_bundle_max = parseInt(configData.bundleMax, 10);
-      if (!(cfg_bundle_max >= 1)) cfg_bundle_max = 1;
+      if (cfg_bundle_max < 1) cfg_bundle_max = 1;
       localStorage.setItem("cfgBundleMax", cfg_bundle_max);
    }
 
@@ -265,8 +265,7 @@ Pebble.addEventListener("webviewclosed", function(e) {
 
    if (configData.extraFields !== null) {
       console.log("received extraFields \"" + configData.extraFields + "\"");
-      cfg_extra_fields = configData.extraFields
-       ? configData.extraFields.split(",") : [];
+      cfg_extra_fields = configData.extraFields ? configData.extraFields.split(",") : [];
       localStorage.setItem("extraFields", cfg_extra_fields.join(","));
    }
 
