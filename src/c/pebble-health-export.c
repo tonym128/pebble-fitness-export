@@ -20,18 +20,6 @@
 #include "dict_tools.h"
 #include "progress_layer.h"
 
-#define MSG_KEY_LAST_SENT	110
-#define MSG_KEY_MODAL_MESSAGE	120
-#define MSG_KEY_UPLOAD_DONE	130
-#define MSG_KEY_UPLOAD_START	140
-#define MSG_KEY_UPLOAD_FAILED	150
-#define MSG_KEY_DATA_KEY	210
-#define MSG_KEY_DATA_LINE	220
-#define MSG_KEY_CFG_START	301
-#define MSG_KEY_CFG_END		302
-#define MSG_KEY_CFG_AUTO_CLOSE	310
-#define MSG_KEY_CFG_WAKEUP_TIME	320
-
 static Window *window;
 static TextLayer *modal_text_layer;
 static char modal_text[256];
@@ -49,6 +37,9 @@ static bool auto_close = false;
 static bool configuring = false;
 static int cfg_wakeup_time = -1;
 static int32_t last_key = 0;
+
+static char * cfg_auth_token;
+static char * cfg_endpoint;
 
 static struct widget {
 	char		label[64];
@@ -307,23 +298,6 @@ send_minute_data(HealthMinuteData *data, HealthActivityMask activity_mask,
 		return;
 	}
 
-	DictionaryResult dict_result;
-	dict_result = dict_write_int(iter, MSG_KEY_DATA_KEY,
-	    &int_key, sizeof int_key, true);
-	if (dict_result != DICT_OK) {
-		APP_LOG(APP_LOG_LEVEL_ERROR,
-		    "send_minute_data: [%d] unable to add data key %" PRIi32,
-		    (int)dict_result, int_key);
-	}
-
-	dict_result = dict_write_cstring(iter,
-	    MSG_KEY_DATA_LINE, global_buffer);
-	if (dict_result != DICT_OK) {
-		APP_LOG(APP_LOG_LEVEL_ERROR,
-		    "send_minute_data: [%d] unable to add data line \"%s\"",
-		    (int)dict_result, global_buffer);
-	}
-
 	msg_result = app_message_outbox_send();
 	if (msg_result) {
 		APP_LOG(APP_LOG_LEVEL_ERROR,
@@ -419,7 +393,7 @@ handle_last_sent(Tuple *tuple) {
 	else {
 		APP_LOG(APP_LOG_LEVEL_ERROR,
 		    "Unexpected type %d or length %" PRIu16
-		    " for MSG_KEY_LAST_SENT",
+		    " for MESSAGE_KEY_lastSent",
 		    (int)tuple->type, tuple->length);
 		return;
 	}
@@ -443,77 +417,106 @@ handle_last_sent(Tuple *tuple) {
 
 static void
 handle_received_tuple(Tuple *tuple) {
-	switch (tuple->key) {
-	    case MSG_KEY_LAST_SENT:
+	  if (tuple->key == MESSAGE_KEY_lastSent) {
 		handle_last_sent (tuple);
-		break;
+    return;
+		}
 
-	    case MSG_KEY_MODAL_MESSAGE:
+  if (tuple->key == MESSAGE_KEY_modalMessage) {
 		if (tuple->type != TUPLE_CSTRING) {
 			APP_LOG(APP_LOG_LEVEL_ERROR,
-			    "Unexpected type %d for MSG_KEY_MODAL_MESSAGE",
+			    "Unexpected type %d for MESSAGE_KEY_modalMessage",
 			    (int)tuple->type);
 		} else {
 			set_modal_mode(true);
 			set_modal_message(tuple->value->cstring);
 		}
-		break;
-
-	    case MSG_KEY_UPLOAD_DONE:
+    return;
+  }
+  
+  if (tuple->key == MESSAGE_KEY_uploadDone) {
 		web.current_key = tuple_uint(tuple);
 		if (!web.first_key) web.first_key = web.current_key;
 		display_dirty = true;
 		if (auto_close && !sending_data
 		    && web.current_key >= phone.current_key)
 			close_app();
-		break;
+    return;
+  }
 
-	    case MSG_KEY_UPLOAD_START:
+	 if (tuple->key == MESSAGE_KEY_uploadStart) {
 		if (!web.first_key) {
 			web.first_key = tuple_uint(tuple);
 			web.start_time = time(0);
 		}
-		break;
+    return;
+   }
 
-	    case MSG_KEY_UPLOAD_FAILED:
+  if (tuple->key == MESSAGE_KEY_uploadFailed) {
 		web.start_time = 0;
 		if (tuple->type == TUPLE_CSTRING)
 			snprintf(web.rate, sizeof web.rate,
 			    "%s", tuple->value->cstring);
-		break;
+    return;
+  }
 
-	    case MSG_KEY_CFG_AUTO_CLOSE:
+	if (tuple->key == MESSAGE_KEY_cfgAutoClose) {
 		auto_close = cfg_auto_close = (tuple_uint(tuple) != 0);
-		persist_write_bool(MSG_KEY_CFG_AUTO_CLOSE, auto_close);
+		persist_write_bool(MESSAGE_KEY_cfgAutoClose, auto_close);
 		if (auto_close && !sending_data
 		    && web.current_key >= phone.current_key)
 			close_app();
-		break;
+    return;
+  }
 
-	    case MSG_KEY_CFG_WAKEUP_TIME:
+	 if (tuple->key == MESSAGE_KEY_cfgWakeupTime) {
 		cfg_wakeup_time = tuple_int(tuple);
-		persist_write_int(MSG_KEY_CFG_WAKEUP_TIME, cfg_wakeup_time + 1);
+		persist_write_int(MESSAGE_KEY_cfgWakeupTime, cfg_wakeup_time + 1);
 		APP_LOG(APP_LOG_LEVEL_INFO,
 		    "wrote cfg_wakeup_time %i", cfg_wakeup_time);
-		break;
+    return;
+   }
 
-	    case MSG_KEY_CFG_START:
+	 if (tuple->key == MESSAGE_KEY_cfgAuthToken) {
+		cfg_auth_token = tuple->value->cstring;
+		persist_write_string(MESSAGE_KEY_cfgAuthToken, cfg_auth_token);
+		APP_LOG(APP_LOG_LEVEL_INFO,
+		    "wrote cfgAuthToken %s", cfg_auth_token);
+    return;
+   }
+ 
+	 if (tuple->key == MESSAGE_KEY_cfgBundleMax) {
+		persist_write_int(MESSAGE_KEY_cfgBundleMax, tuple_int(tuple));
+		APP_LOG(APP_LOG_LEVEL_INFO,
+		    "wrote cfg_bundle_max %i", tuple_int(tuple));
+    return;
+   }
+
+ 	 if (tuple->key == MESSAGE_KEY_cfgEndpoint) {
+		cfg_endpoint = tuple->value->cstring;
+		persist_write_string(MESSAGE_KEY_cfgAuthToken, cfg_endpoint);
+		APP_LOG(APP_LOG_LEVEL_INFO,
+		    "wrote cfg_endpoint %s", cfg_endpoint);
+    return;
+   }
+  
+	  if (tuple->key == MESSAGE_KEY_cfgStart) {
 		APP_LOG(APP_LOG_LEVEL_INFO, "Starting configuration");
 		auto_close = false;
 		configuring = true;
-		break;
+    return;
+    }
 
-	    case MSG_KEY_CFG_END:
+	  if (tuple->key == MESSAGE_KEY_cfgEnd) {
 		APP_LOG(APP_LOG_LEVEL_INFO, "End of configuration");
 		auto_close = cfg_auto_close;
 		configuring = false;
-		break;
+    return;
+    }
 
-	    default:
 		APP_LOG(APP_LOG_LEVEL_ERROR,
-		    "Unknown key %lu in received message",
-		    (unsigned long)tuple->key);
-	}
+		    "Unknown key %lu in received message, value : %s",
+		    (unsigned long)tuple->key, tuple->value);
 }
 
 static void
@@ -551,10 +554,9 @@ tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 
 static void
 init(void) {
-	cfg_auto_close = persist_read_bool(MSG_KEY_CFG_AUTO_CLOSE);
-	cfg_wakeup_time = persist_read_int(MSG_KEY_CFG_WAKEUP_TIME) - 1;
-	APP_LOG(APP_LOG_LEVEL_INFO,
-	    "read cfg_wakeup_time %i", cfg_wakeup_time);
+	APP_LOG(APP_LOG_LEVEL_INFO, "init starting");
+	cfg_auto_close = persist_read_bool(MESSAGE_KEY_cfgAutoClose);
+	cfg_wakeup_time = persist_read_int(MESSAGE_KEY_cfgWakeupTime) - 1;
 	auto_close = (cfg_auto_close || launch_reason() == APP_LAUNCH_WAKEUP);
 
 	app_message_register_inbox_received(inbox_received_handler);
@@ -571,9 +573,11 @@ init(void) {
 	window_stack_push(window, true);
 	tick_timer_service_subscribe(SECOND_UNIT, &tick_handler);
 	wakeup_cancel_all();
+	APP_LOG(APP_LOG_LEVEL_INFO, "init complete");
 }
 
 static void deinit(void) {
+	APP_LOG(APP_LOG_LEVEL_INFO, "deinit starting"); 
 	window_destroy(window);
 
 	if (cfg_wakeup_time >= 0) {
@@ -597,6 +601,7 @@ static void deinit(void) {
 	} else {
 		APP_LOG(APP_LOG_LEVEL_INFO, "No wakeup to setup");
 	}
+	APP_LOG(APP_LOG_LEVEL_INFO, "deinit complete"); 
 }
 
 int
