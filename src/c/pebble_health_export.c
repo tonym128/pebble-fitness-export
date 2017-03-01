@@ -449,7 +449,7 @@ handle_received_tuple(Tuple *tuple) {
   }
   
   if (tuple->key == MESSAGE_KEY_uploadDone) {
-		APP_LOG(APP_LOG_LEVEL_INFO, "MESSAGE_KEY_uploadDone");
+		// APP_LOG(APP_LOG_LEVEL_INFO, "MESSAGE_KEY_uploadDone");
     web.current_key = tuple_uint(tuple);
 		if (!web.first_key) web.first_key = web.current_key;
 		display_dirty = true;
@@ -460,7 +460,7 @@ handle_received_tuple(Tuple *tuple) {
   }
 
 	 if (tuple->key == MESSAGE_KEY_uploadStart) {
-		APP_LOG(APP_LOG_LEVEL_INFO, "MESSAGE_KEY_uploadStart");
+		// APP_LOG(APP_LOG_LEVEL_INFO, "MESSAGE_KEY_uploadStart");
 		if (!web.first_key) {
 			web.first_key = tuple_uint(tuple);
 			web.start_time = time(0);
@@ -499,7 +499,7 @@ handle_received_tuple(Tuple *tuple) {
 		    "wrote cfg_wakeup_time %i", cfg_wakeup_time);
     return;
    }
-
+  
 	 if (tuple->key == MESSAGE_KEY_cfgAuthToken) {
 		cfg_auth_token = tuple->value->cstring;
 		persist_write_string(MESSAGE_KEY_cfgAuthToken, cfg_auth_token);
@@ -596,24 +596,16 @@ static void deinit(void) {
 	APP_LOG(APP_LOG_LEVEL_INFO, "deinit starting"); 
 	window_destroy(window);
 
-	if (cfg_wakeup_time >= 0) {
+	if (cfg_wakeup_time > 0) {
 		WakeupId res;
-		time_t now = time(0);
-		time_t t = clock_to_timestamp(TODAY,
-		    cfg_wakeup_time / 60, cfg_wakeup_time % 60);
-
-		if (t - now > 6 * 86400)
-			t -= 6 * 86400;
-		else if (t - now <= 120)
-			t += 86400;
-
-		res = wakeup_schedule(t, 0, true);
+		time_t wakeup_time = time(NULL) + cfg_wakeup_time * 60;
+		res = wakeup_schedule(wakeup_time, 0, true);
 
 		if (res < 0)
 			APP_LOG(APP_LOG_LEVEL_ERROR,
 			    "wakeup_schedule(%" PRIi32 ", 0, true)"
 			    " returned %" PRIi32,
-			    t, res);
+			    wakeup_time, res);
 	} else {
 		APP_LOG(APP_LOG_LEVEL_INFO, "No wakeup to setup");
 	}

@@ -41,7 +41,7 @@ module.exports = [
       "min": 1,
       "max": 100,
       "step": 1
-    }
+      }
     ]
   },
   {
@@ -62,7 +62,17 @@ module.exports = [
         "messageKey": "resend",
         "label": "Resend Data",
         "defaultValue": false
-      }
+      },
+      {
+        "type": "slider",
+        "messageKey": "cfgWakeupTime",
+        "defaultValue": 0,
+        "label": "Upload Every x minutes",
+        "description": "How Often to Wakeup to Upload Data in minutes (0 don't), 1440 minutes = 1 day",
+        "min": 0,
+        "max": 2880,
+        "step": 1
+     }
   ]
   },
   {
