@@ -1,5 +1,5 @@
 {
-    "author": "Anthony Mamacos",
+    "author": "Tony Mamacos",
     "dependencies": {
         "pebble-clay": "^1.0.3"
     },
@@ -10,7 +10,7 @@
             "configurable",
             "health"
         ],
-        "displayName": "Pebble Health Export",
+        "displayName": "Health Export",
         "enableMultiJS": true,
         "messageKeys": [
             "lastSent",
@@ -24,7 +24,10 @@
             "cfgWakeupTime",
             "cfgEndpoint",
             "cfgAuthToken",
-            "cfgBundleMax"
+            "dataKey",
+            "dataLine",
+            "cfgBundleMax",
+            "resend"
         ],
         "projectType": "native",
         "resources": {
@@ -32,10 +35,9 @@
         },
         "sdkVersion": "3",
         "targetPlatforms": [
-            "diorite",
-            "emery"
+            "diorite"
         ],
-        "uuid": "d2cb5dda-d554-47d7-bed7-357bd1685ed7",
+        "uuid": "4f74f17d-ba86-4e01-83d0-dcbd8bedff03",
         "watchapp": {
             "watchface": false
         }

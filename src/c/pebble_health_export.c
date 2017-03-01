@@ -34,7 +34,6 @@ static char global_buffer[1024];
 static bool sending_data = false;
 static bool cfg_auto_close = false;
 static bool auto_close = false;
-static bool configuring = false;
 static int cfg_wakeup_time = -1;
 static int32_t last_key = 0;
 
@@ -272,8 +271,7 @@ minute_data_image(char *buffer, size_t size,
 }
 
 /* send_minute_data - use AppMessage to send the given minute data to phone */
-static void
-send_minute_data(HealthMinuteData *data, HealthActivityMask activity_mask,
+static void send_minute_data(HealthMinuteData *data, HealthActivityMask activity_mask,
     time_t key) {
 	int32_t int_key = key / 60;
 
@@ -298,7 +296,25 @@ send_minute_data(HealthMinuteData *data, HealthActivityMask activity_mask,
 		return;
 	}
 
+	DictionaryResult dict_result;
+	dict_result = dict_write_int(iter, MESSAGE_KEY_dataKey,
+	    &int_key, sizeof int_key, true);
+	if (dict_result != DICT_OK) {
+		APP_LOG(APP_LOG_LEVEL_ERROR,
+		    "send_minute_data: [%d] unable to add data key %" PRIi32,
+		    (int)dict_result, int_key);
+	}
+
+	dict_result = dict_write_cstring(iter,
+	    MESSAGE_KEY_dataLine, global_buffer);
+	if (dict_result != DICT_OK) {
+		APP_LOG(APP_LOG_LEVEL_ERROR,
+		    "send_minute_data: [%d] unable to add data line \"%s\"",
+		    (int)dict_result, global_buffer);
+	}
+
 	msg_result = app_message_outbox_send();
+  
 	if (msg_result) {
 		APP_LOG(APP_LOG_LEVEL_ERROR,
 		    "send_minute_data: app_message_outbox_send returned %d",
@@ -310,8 +326,7 @@ send_minute_data(HealthMinuteData *data, HealthActivityMask activity_mask,
 	display_dirty = true;
 }
 
-static bool
-record_activity(HealthActivity activity, time_t start_time, time_t end_time,
+static bool record_activity(HealthActivity activity, time_t start_time, time_t end_time,
     void *context) {
 	uint16_t first_index, last_index;
 	(void)context;
@@ -335,8 +350,7 @@ record_activity(HealthActivity activity, time_t start_time, time_t end_time,
 	return true;
 }
 
-static bool
-load_minute_data_page(time_t start) {
+static bool load_minute_data_page(time_t start) {
 	minute_first = start;
 	minute_last = time(0);
 	minute_data_size = health_service_get_minute_history(minute_data,
@@ -358,7 +372,7 @@ load_minute_data_page(time_t start) {
 	if (!minute_data_size) {
 		APP_LOG(APP_LOG_LEVEL_ERROR,
 		    "health_service_get_minute_history returned 0");
-		minute_first = minute_last = 0;
+		// minute_first = minute_last = 0;
 		return false;
 	}
 
@@ -384,21 +398,8 @@ send_next_line(void) {
 }
 
 static void
-handle_last_sent(Tuple *tuple) {
-	uint32_t ikey = 0;
-	if (tuple->length == 4 && tuple->type == TUPLE_UINT)
-		ikey = tuple->value->uint32;
-	else if (tuple->length == 4 && tuple->type == TUPLE_INT)
-		ikey = tuple->value->int32;
-	else {
-		APP_LOG(APP_LOG_LEVEL_ERROR,
-		    "Unexpected type %d or length %" PRIu16
-		    " for MESSAGE_KEY_lastSent",
-		    (int)tuple->type, tuple->length);
-		return;
-	}
-	APP_LOG(APP_LOG_LEVEL_INFO, "received LAST_SENT %" PRIu32, ikey);
-
+  setup_last_sent(uint32_t ikey) {
+  
 	phone.start_time = time(0);
 	phone.first_key = phone.current_key = 0;
 	web.start_time = 0;
@@ -407,12 +408,26 @@ handle_last_sent(Tuple *tuple) {
 	minute_data_size = 0;
 	minute_last = ikey ? (ikey + 1) * 60 : 0;
 	set_modal_mode(false);
+}
 
-	if (!sending_data) {
-		sending_data = true;
-		last_key = 0;
-		send_next_line();
+static void
+handle_last_sent(Tuple *tuple) {
+	uint32_t ikey = 0;
+	if (tuple->length == 4 && tuple->type == TUPLE_UINT)
+		ikey = tuple->value->uint32;
+	else if (tuple->length == 4 && tuple->type == TUPLE_INT)
+		ikey = tuple->value->int32;
+  else if (tuple->type == TUPLE_CSTRING)
+		ikey = atoi(tuple->value->cstring);
+	else {
+		APP_LOG(APP_LOG_LEVEL_ERROR,
+		    "Unexpected type %d or length %" PRIu16
+		    " for MESSAGE_KEY_lastSent",
+		    (int)tuple->type, tuple->length);
+		return;
 	}
+	APP_LOG(APP_LOG_LEVEL_INFO, "received LAST_SENT %" PRIu32, ikey);
+  setup_last_sent(ikey);
 }
 
 static void
@@ -421,7 +436,6 @@ handle_received_tuple(Tuple *tuple) {
 		handle_last_sent (tuple);
     return;
 		}
-
   if (tuple->key == MESSAGE_KEY_modalMessage) {
 		if (tuple->type != TUPLE_CSTRING) {
 			APP_LOG(APP_LOG_LEVEL_ERROR,
@@ -435,7 +449,8 @@ handle_received_tuple(Tuple *tuple) {
   }
   
   if (tuple->key == MESSAGE_KEY_uploadDone) {
-		web.current_key = tuple_uint(tuple);
+		APP_LOG(APP_LOG_LEVEL_INFO, "MESSAGE_KEY_uploadDone");
+    web.current_key = tuple_uint(tuple);
 		if (!web.first_key) web.first_key = web.current_key;
 		display_dirty = true;
 		if (auto_close && !sending_data
@@ -445,6 +460,7 @@ handle_received_tuple(Tuple *tuple) {
   }
 
 	 if (tuple->key == MESSAGE_KEY_uploadStart) {
+		APP_LOG(APP_LOG_LEVEL_INFO, "MESSAGE_KEY_uploadStart");
 		if (!web.first_key) {
 			web.first_key = tuple_uint(tuple);
 			web.start_time = time(0);
@@ -452,7 +468,14 @@ handle_received_tuple(Tuple *tuple) {
     return;
    }
 
+  if (tuple->key == MESSAGE_KEY_resend) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "MESSAGE_KEY_resend");
+    setup_last_sent(0);
+    return;
+  }
+  
   if (tuple->key == MESSAGE_KEY_uploadFailed) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "MESSAGE_KEY_uploadFailed");
 		web.start_time = 0;
 		if (tuple->type == TUPLE_CSTRING)
 			snprintf(web.rate, sizeof web.rate,
@@ -500,20 +523,6 @@ handle_received_tuple(Tuple *tuple) {
     return;
    }
   
-	  if (tuple->key == MESSAGE_KEY_cfgStart) {
-		APP_LOG(APP_LOG_LEVEL_INFO, "Starting configuration");
-		auto_close = false;
-		configuring = true;
-    return;
-    }
-
-	  if (tuple->key == MESSAGE_KEY_cfgEnd) {
-		APP_LOG(APP_LOG_LEVEL_INFO, "End of configuration");
-		auto_close = cfg_auto_close;
-		configuring = false;
-    return;
-    }
-
 		APP_LOG(APP_LOG_LEVEL_ERROR,
 		    "Unknown key %lu in received message, value : %s",
 		    (unsigned long)tuple->key, tuple->value);
@@ -528,6 +537,12 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 	    tuple;
 	    tuple = dict_read_next(iterator))
 		handle_received_tuple(tuple);
+  
+	if (!sending_data) {
+		sending_data = true;
+		last_key = 0;
+		send_next_line();
+	}
 }
 
 static void
@@ -558,7 +573,8 @@ init(void) {
 	cfg_auto_close = persist_read_bool(MESSAGE_KEY_cfgAutoClose);
 	cfg_wakeup_time = persist_read_int(MESSAGE_KEY_cfgWakeupTime) - 1;
 	auto_close = (cfg_auto_close || launch_reason() == APP_LAUNCH_WAKEUP);
-
+  last_key = persist_read_int(MESSAGE_KEY_lastSent);
+  
 	app_message_register_inbox_received(inbox_received_handler);
 	app_message_register_outbox_failed(outbox_failed_handler);
 	app_message_register_outbox_sent(outbox_sent_handler);

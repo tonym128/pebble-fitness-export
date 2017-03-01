@@ -27,6 +27,12 @@ module.exports = [
         "label": "Auth Token"
       },
       {
+        "type": "input",
+        "messageKey": "lastSent",
+        "defaultValue": "0",
+        "label": "Last Sent Timestamp"
+      },
+      {
       "type": "slider",
       "messageKey": "cfgBundleMax",
       "defaultValue": 50,
@@ -49,6 +55,12 @@ module.exports = [
         "type": "toggle",
         "messageKey": "cfgAutoClose",
         "label": "AutoClose",
+        "defaultValue": false
+      },
+      {
+        "type": "toggle",
+        "messageKey": "resend",
+        "label": "Resend Data",
         "defaultValue": false
       }
   ]
