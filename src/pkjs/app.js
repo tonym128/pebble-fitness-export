@@ -26,14 +26,18 @@ var cfg_auto_close = false;
 var cfg_wakeup_time = -1;
 
 var to_send = [];
-var senders = [new XMLHttpRequest(), new XMLHttpRequest()];
-var i_sender = 1;
+var sender = new XMLHttpRequest();
 var bundle_size = 0;
+var startDate = new Date();
+
+var endDate   = new Date();
+var seconds = (endDate.getTime() - startDate.getTime()) / 1000;
+var sending = false;
 
 function sendPayload(payload) {
    var payload_array = [];
    var counter = 0;
-
+  
    while (counter < payload.length) {
      var data = {};
      var components = payload[counter].split(',');
@@ -49,23 +53,33 @@ function sendPayload(payload) {
      counter++;
     }
 
-   i_sender = 1 - i_sender;
-   senders[i_sender].open("POST", cfg_endpoint, true);
-   senders[i_sender].setRequestHeader("Authorization", "Token token="+cfg_auth_token);
-   senders[i_sender].setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-   senders[i_sender].send(JSON.stringify(payload_array));
+   sender.open("POST", cfg_endpoint, true);
+   sender.setRequestHeader("Authorization", "Token token="+cfg_auth_token);
+   sender.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+   sender.send(JSON.stringify(payload_array));
 }
 
 function sendHead() {
    if (to_send.length < 1) return;
+   sending = true;
    bundle_size = 0;
-   var payload = [];
-   while (bundle_size < cfg_bundle_max && bundle_size < to_send.length) {
-      payload.push(to_send[bundle_size].split(";")[1]);
-      bundle_size += 1;
-   }
 
-   sendPayload(payload);
+  endDate = new Date();  
+  seconds = (endDate.getTime() - startDate.getTime()) / 1000;
+  if (to_send.length < cfg_bundle_max || seconds < 5) {
+    sending = false;
+    return;
+  }
+  
+  startDate = endDate;
+
+  var payload = [];
+  while (bundle_size < cfg_bundle_max && bundle_size < to_send.length) {
+     payload.push(to_send[bundle_size].split(";")[1]);
+     bundle_size += 1;
+  }
+
+  sendPayload(payload);
 }
 
 function enqueue(key, line) {
@@ -78,35 +92,35 @@ function enqueue(key, line) {
   claysettings.lastSent = key;
   localStorage.setItem("clay-settings",JSON.stringify(claysettings));
    
-  if (to_send.length === 1) {
+  if (to_send.length > 1 && !sending) {
       Pebble.sendAppMessage({ "uploadStart": parseInt(key, 10) });
       sendHead();
   }
 }
 
 function uploadDone() {
+   sending = false;
    if (bundle_size > 1) {
       to_send.splice(0, bundle_size - 1);
    }
-  
+
    var sent_key = to_send.shift().split(";")[0];
    localStorage.setItem("toSend", to_send.join("|"));
-  
+
    Pebble.sendAppMessage({ "uploadDone": parseInt(sent_key, 10) });
-   // console.log("Upload Done : " + parseInt(sent_key, 10));
+   console.log("Upload Done : " + parseInt(sent_key, 10));
 
    sendHead();
 }
 
 function uploadError() {
+   sending = false;
    console.log(this.statusText);
    Pebble.sendAppMessage({ "uploadFailed": this.statusText });
 }
 
-senders[0].addEventListener("load", uploadDone);
-senders[0].addEventListener("error", uploadError);
-senders[1].addEventListener("load", uploadDone);
-senders[1].addEventListener("error", uploadError);
+sender.addEventListener("load", uploadDone);
+sender.addEventListener("error", uploadError);
 
 function loadSettings() {  
   var msg = {};
@@ -134,8 +148,7 @@ function loadSettings() {
      console.log("Initiating Resend");
      claysettings.resend = false;
 
-     senders[0].abort();
-     senders[1].abort();
+     sender.abort();
      localStorage.setItem("toSend", "");
      localStorage.setItem("lastSent", "0");
      to_send = [];
@@ -173,6 +186,6 @@ Pebble.addEventListener("ready", function() {
 
 Pebble.addEventListener("appmessage", function(e) {
    if (e.payload.dataKey && e.payload.dataLine) {
-      enqueue(e.payload.dataKey, e.payload.dataLine);
+     enqueue(e.payload.dataKey, e.payload.dataLine);
    }
 });
