@@ -31,10 +31,19 @@
         ],
         "projectType": "native",
         "resources": {
-            "media": []
+            "media": [
+                {
+                    "file": "images/BonesExport.bmp",
+                    "menuIcon": true,
+                    "name": "bmp_bones_export",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                }
+            ]
         },
         "sdkVersion": "3",
         "targetPlatforms": [
+            "basalt",
             "diorite"
         ],
         "uuid": "4f74f17d-ba86-4e01-83d0-dcbd8bedff03",
