@@ -66,7 +66,7 @@ function sendHead() {
 
   endDate = new Date();  
   seconds = (endDate.getTime() - startDate.getTime()) / 1000;
-  if (to_send.length < cfg_bundle_max || seconds < 5) {
+  if (to_send.length < cfg_bundle_max && seconds < 5) {
     sending = false;
     return;
   }
@@ -79,6 +79,7 @@ function sendHead() {
      bundle_size += 1;
   }
 
+  console.log("BundleSize : " + parseInt(bundle_size) + " Seconds : " + parseInt(seconds));
   sendPayload(payload);
 }
 
@@ -108,7 +109,6 @@ function uploadDone() {
    localStorage.setItem("toSend", to_send.join("|"));
 
    Pebble.sendAppMessage({ "uploadDone": parseInt(sent_key, 10) });
-   console.log("Upload Done : " + parseInt(sent_key, 10));
 
    sendHead();
 }
@@ -161,6 +161,7 @@ function loadSettings() {
    if (cfg_endpoint) {
       msg.lastSent = parseInt(localStorage.getItem("lastSent") || "0", 10);
       Pebble.sendAppMessage(msg);
+      return;
    } else {
       msg.modalMessage = "Not configured";
       console.log("Not configured");
@@ -172,10 +173,8 @@ function loadSettings() {
       msg.uploadStart = parseInt(to_send[0].split(";")[0]);
       console.log("Upload Start : " + msg.uploadStart);
       Pebble.sendAppMessage(msg);
-   }
-  
-  if (to_send.length >= 1) {
       sendHead();
+      return;
    }
 }
 
